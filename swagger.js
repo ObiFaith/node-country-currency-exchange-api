@@ -11,7 +11,7 @@ const docs = {
       "A RESTful API that fetches country data from an external API, stores it in a database, and provides CRUD operations.",
   },
   basePath: "/",
-  schemes: ["http"],
+  schemes: ["https"],
   host: process.env.HOST,
   tags: [
     { name: "Home" },
