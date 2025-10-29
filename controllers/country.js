@@ -67,28 +67,6 @@ export const getCountries = async (req, res) => {
   res.status(StatusCodes.OK).json(countries);
 };
 
-const fetchCountriesData = async () => {
-  try {
-    return await axios.get(process.env.REST_COUNTRY_URL);
-  } catch (error) {
-    res.status(StatusCodes.SERVICE_UNAVAILABLE).json({
-      error: "External data source unavailable",
-      details: "Could not fetch data from restcountries api",
-    });
-  }
-};
-
-const fetchExchangeRates = async () => {
-  try {
-    return await axios.get(process.env.COUNTRY_RATE_URL);
-  } catch (error) {
-    res.status(StatusCodes.SERVICE_UNAVAILABLE).json({
-      error: "External data source unavailable",
-      details: "Could not fetch data from open.er-api",
-    });
-  }
-};
-
 export const RefreshCountries = async (req, res) => {
   try {
     const [countryRes, rateRes] = await Promise.all([
@@ -100,37 +78,40 @@ export const RefreshCountries = async (req, res) => {
     const exchangeRates = rateRes.data.rates;
     const last_refreshed_at = new Date().toISOString();
 
-    const countries = countryData.map(async (country) => {
-      const population = country.population;
-      const currency_code = country.currencies?.[0]?.code || null;
-      const normalized_name = await getNormalizedName(country.name);
+    const countries = await Promise.all(
+      countryData.map(async (country) => {
+        const population = country.population;
+        const currency_code = country.currencies?.[0]?.code || null;
+        const normalized_name = await getNormalizedName(country.name);
 
-      let estimated_gdp = 0;
-      let exchange_rate = null;
+        let estimated_gdp = 0;
+        let exchange_rate = null;
 
-      if (currency_code) {
-        exchange_rate = exchangeRates[currency_code];
-        if (exchange_rate)
-          estimated_gdp =
-            (population * getRandomNumBtw1000To2000()) / exchange_rate;
-        else estimated_gdp = null;
-      }
+        if (currency_code) {
+          exchange_rate = exchangeRates[currency_code];
+          if (exchange_rate)
+            estimated_gdp =
+              (population * getRandomNumBtw1000To2000()) / exchange_rate;
+          else estimated_gdp = null;
+        }
 
-      return {
-        name: country.name,
-        normalized_name,
-        capital: country.capital,
-        region: country.region,
-        population,
-        currency_code,
-        exchange_rate,
-        estimated_gdp,
-        flag_url: country.flag,
-        last_refreshed_at,
-      };
-    });
+        return {
+          name: country.name,
+          normalized_name,
+          capital: country.capital,
+          region: country.region,
+          population,
+          currency_code,
+          exchange_rate,
+          estimated_gdp,
+          flag_url: country.flag,
+          last_refreshed_at,
+        };
+      })
+    );
 
-    await prisma.country.deleteMany({});
+    // Reset table and auto-increment
+    await prisma.$executeRawUnsafe(`TRUNCATE TABLE Country`);
     await prisma.country.createMany({ data: countries });
 
     res
@@ -138,9 +119,22 @@ export const RefreshCountries = async (req, res) => {
       .json({ message: "Countries refreshed successfully." });
   } catch (error) {
     console.error(error);
-    res
-      .status(StatusCodes.INTERNAL_SERVER_ERROR)
-      .json({ error: "Failed to refresh countries." });
+
+    if (error.config?.url) {
+      const apiName =
+        error.config?.url === process.env.REST_COUNTRY_URL
+          ? "restcountries api"
+          : "open.er-api";
+
+      res.status(StatusCodes.SERVICE_UNAVAILABLE).json({
+        error: "External data source unavailable",
+        details: `Could not fetch data from ${apiName}`,
+      });
+    } else {
+      res
+        .status(StatusCodes.INTERNAL_SERVER_ERROR)
+        .json({ error: "Internal server error" });
+    }
   }
 };
 

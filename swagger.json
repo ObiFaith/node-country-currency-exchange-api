@@ -83,6 +83,19 @@
         }
       }
     },
+    "/countries/status": {
+      "get": {
+        "tags": [
+          "Countries"
+        ],
+        "description": "",
+        "responses": {
+          "default": {
+            "description": ""
+          }
+        }
+      }
+    },
     "/countries/{name}": {
       "get": {
         "tags": [
@@ -125,19 +138,6 @@
     },
     "/countries/refresh": {
       "post": {
-        "tags": [
-          "Countries"
-        ],
-        "description": "",
-        "responses": {
-          "default": {
-            "description": ""
-          }
-        }
-      }
-    },
-    "/countries/status": {
-      "get": {
         "tags": [
           "Countries"
         ],
