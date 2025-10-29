@@ -23,7 +23,7 @@ model Country {
   population        Int
   currency_code     String?
   exchange_rate     Float?
-  estimated_gdp     Float
+  estimated_gdp     Float?
   flag_url          String?
   last_refreshed_at DateTime    @default(now())
 }

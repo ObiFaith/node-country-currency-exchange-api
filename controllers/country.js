@@ -1,57 +1,82 @@
 import axios from "axios";
 import { StatusCodes } from "http-status-codes";
+import { NotFoundError } from "../errors/index.js";
 import { PrismaClient } from "../generated/prisma/client.js";
 
-const prisma = new PrismaClient({
-  omit: {
-    country: {
-      normalized_name: true,
-    },
-  },
-});
+const prisma = new PrismaClient();
 
-/* 
-[
-    {
-        "id": 1,
-        "name": "Nigeria",
-        "capital": "Abuja",
-        "region": "Africa",
-        "population": 206139589,
-        "currency_code": "NGN",
-        "exchange_rate": 1600.23,
-        "estimated_gdp": 25767448125.2, // estimated_gdp = population × random(1000–2000) ÷ exchange_rate
-        "flag_url": "https://flagcdn.com/ng.svg",
-        "last_refreshed_at": "2025-10-22T18:00:00Z"
-    }
-]
-
-
-    const contryCodes = countryData.map(
-      (country) => country.currencies[0].code
-    );
-*/
+const sortFieldMap = {
+  name: "name",
+  region: "region",
+  population: "population",
+  currency: "currency_code",
+  gdp: "estimated_gdp",
+  exchange_rate: "exchange_rate",
+  last_refreshed: "last_refreshed_at",
+  capital: "capital",
+};
 
 const getRandomNumBtw1000To2000 = () =>
   Math.floor(Math.random() * (2000 - 1000 + 1)) + 1000;
 
+const getNormalizedName = async (name) => name.toLowerCase().trim();
+
 export const getCountries = async (req, res) => {
-  const countries = await prisma.country.findMany();
-  res.status(StatusCodes.OK).json({ countries });
+  let orderBy;
+  const filters = {};
+
+  const {
+    name,
+    sort,
+    region,
+    capital,
+    currency,
+    min_population,
+    max_population,
+  } = req.query;
+
+  if (name) filters.name = { contains: name };
+  if (region) filters.region = { equals: region };
+  if (capital) filters.capital = { equals: capital };
+  if (currency) filters.currency_code = { equals: currency };
+
+  if (min_population || max_population) {
+    filters.population = {};
+    if (min_population) filters.population.gte = Number(min_population);
+    if (max_population) filters.population.lte = Number(max_population);
+  }
+
+  if (sort) {
+    const [field, direction] = sort.split("_");
+    const sortField = sortFieldMap[field.toLowerCase()];
+    orderBy = {
+      [sortField]: direction === "desc" ? "desc" : "asc",
+    };
+  }
+
+  const countries = await prisma.country.findMany({
+    where: filters,
+    orderBy,
+  });
+
+  res.status(StatusCodes.OK).json(countries);
 };
 
 export const RefreshCountries = async (req, res) => {
   try {
-    const { data: countryData } = await axios.get(process.env.REST_COUNTRY_URL);
-    console.log("Country Data Fetched!");
+    const [countryRes, rateRes] = await Promise.all([
+      axios.get(process.env.REST_COUNTRY_URL),
+      axios.get(process.env.COUNTRY_RATE_URL),
+    ]);
 
-    const {
-      data: { rates: exchangeRates },
-    } = await axios.get(process.env.COUNTRY_RATE_URL);
+    const countryData = countryRes.data;
+    const exchangeRates = rateRes.data.rates;
+    const last_refreshed_at = new Date().toISOString();
 
-    const countries = countryData.map((country) => {
+    const countries = countryData.map(async (country) => {
       const population = country.population;
       const currency_code = country.currencies?.[0]?.code || null;
+      const normalized_name = await getNormalizedName(country.name);
 
       let estimated_gdp = 0;
       let exchange_rate = null;
@@ -66,6 +91,7 @@ export const RefreshCountries = async (req, res) => {
 
       return {
         name: country.name,
+        normalized_name,
         capital: country.capital,
         region: country.region,
         population,
@@ -73,26 +99,12 @@ export const RefreshCountries = async (req, res) => {
         exchange_rate,
         estimated_gdp,
         flag_url: country.flag,
+        last_refreshed_at,
       };
     });
 
-    const data = await Promise.all(
-      countries.map(async (country) => {
-        const normalized_name = country.name.toLowerCase().trim();
-
-        await prisma.country.upsert({
-          where: { normalized_name },
-          update: { ...country, last_refreshed_at: new Date().toISOString() },
-          create: {
-            ...country,
-            normalized_name,
-            last_refreshed_at: new Date().toISOString(),
-          },
-        });
-      })
-    );
-
-    console.log(data[data.length - 1]);
+    await prisma.country.deleteMany({});
+    await prisma.country.createMany({ data: countries });
 
     res
       .status(StatusCodes.CREATED)
@@ -104,3 +116,25 @@ export const RefreshCountries = async (req, res) => {
       .json({ error: "Failed to refresh countries." });
   }
 };
+
+export const getCountry = async (req, res) => {
+  const normalized_name = await getNormalizedName(req.params.name);
+  const country = await prisma.country.findUnique({
+    where: { normalized_name },
+  });
+
+  if (!country) throw new NotFoundError("Country not found!");
+
+  res.status(StatusCodes.OK).json(country);
+};
+
+export const deleteCountry = async (req, res) => {
+  const normalized_name = await getNormalizedName(req.params.name);
+  const country = await prisma.country.delete({ where: { normalized_name } });
+
+  if (!country) throw new NotFoundError("Country not found!");
+
+  res.status(StatusCodes.NO_CONTENT).send();
+};
+
+await prisma.$disconnect();
