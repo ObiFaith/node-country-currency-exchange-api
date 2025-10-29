@@ -3,7 +3,13 @@ import { StatusCodes } from "http-status-codes";
 import { NotFoundError } from "../errors/index.js";
 import { PrismaClient } from "../generated/prisma/client.js";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  omit: {
+    country: {
+      normalized_name: false,
+    },
+  },
+});
 
 const sortFieldMap = {
   name: "name",
@@ -123,7 +129,8 @@ export const getCountry = async (req, res) => {
     where: { normalized_name },
   });
 
-  if (!country) throw new NotFoundError("Country not found!");
+  if (!country)
+    res.status(StatusCodes.NOT_FOUND).json({ error: "Country not found" });
 
   res.status(StatusCodes.OK).json(country);
 };
@@ -132,7 +139,8 @@ export const deleteCountry = async (req, res) => {
   const normalized_name = await getNormalizedName(req.params.name);
   const country = await prisma.country.delete({ where: { normalized_name } });
 
-  if (!country) throw new NotFoundError("Country not found!");
+  if (!country)
+    res.status(StatusCodes.NOT_FOUND).json({ error: "Country not found" });
 
   res.status(StatusCodes.NO_CONTENT).send();
 };

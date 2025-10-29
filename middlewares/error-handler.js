@@ -4,10 +4,7 @@ import { StatusCodes } from "http-status-codes";
 export const ErrorHandler = (err, req, res, next) => {
   let { message } = err;
 
-  let statusCode =
-    err instanceof CustomAPIError
-      ? err.statusCode
-      : StatusCodes.INTERNAL_SERVER_ERROR;
+  let statusCode = StatusCodes.INTERNAL_SERVER_ERROR;
 
   // Handle Mongoose validation errors
   if (err.name === "ValidationError") {
