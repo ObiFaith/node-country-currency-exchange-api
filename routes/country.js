@@ -9,8 +9,9 @@ import {
 
 const router = express.Router();
 
-router.route("/").get(getCountries);
-router.route("/:name").get(getCountry).delete(deleteCountry);
-router.route("/refresh").post(RefreshCountries);
+router.route("/countries").get(getCountries);
+router.route("/status").get(getCountryStatus);
+router.route("/countries/:name").get(getCountry).delete(deleteCountry);
+router.route("/countries/refresh").post(RefreshCountries);
 
 export default router;

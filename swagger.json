@@ -33,17 +33,7 @@
         }
       }
     },
-    "/status": {
-      "get": {
-        "description": "",
-        "responses": {
-          "default": {
-            "description": ""
-          }
-        }
-      }
-    },
-    "/countries/": {
+    "/countries": {
       "get": {
         "tags": [
           "Countries"
@@ -86,6 +76,19 @@
             "type": "string"
           }
         ],
+        "responses": {
+          "default": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/status": {
+      "get": {
+        "tags": [
+          "Countries"
+        ],
+        "description": "",
         "responses": {
           "default": {
             "description": ""

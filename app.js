@@ -32,15 +32,7 @@ app.get("/", (_, res) =>
   )
 );
 
-app.get("/status", async (req, res) => {
-  const total_countries = await prisma.country.count();
-  const { last_refreshed_at } = await prisma.country.findFirst({
-    select: { last_refreshed_at: true },
-  });
-
-  res.status(StatusCodes.OK).json({ total_countries, last_refreshed_at });
-});
-app.use("/countries", /* #swagger.tags = ['Countries'] */ countryRoutes);
+app.use("/", /* #swagger.tags = ['Countries'] */ countryRoutes);
 
 // error handler
 app.use(NotFound);
