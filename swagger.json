@@ -135,6 +135,19 @@
           }
         }
       }
+    },
+    "/countries/status": {
+      "get": {
+        "tags": [
+          "Countries"
+        ],
+        "description": "",
+        "responses": {
+          "default": {
+            "description": ""
+          }
+        }
+      }
     }
   }
 }

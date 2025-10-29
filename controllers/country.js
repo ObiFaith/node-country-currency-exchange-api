@@ -1,6 +1,5 @@
 import axios from "axios";
 import { StatusCodes } from "http-status-codes";
-import { NotFoundError } from "../errors/index.js";
 import { PrismaClient } from "../generated/prisma/client.js";
 
 const prisma = new PrismaClient({
@@ -66,6 +65,28 @@ export const getCountries = async (req, res) => {
   });
 
   res.status(StatusCodes.OK).json(countries);
+};
+
+const fetchCountriesData = async () => {
+  try {
+    return await axios.get(process.env.REST_COUNTRY_URL);
+  } catch (error) {
+    res.status(StatusCodes.SERVICE_UNAVAILABLE).json({
+      error: "External data source unavailable",
+      details: "Could not fetch data from restcountries api",
+    });
+  }
+};
+
+const fetchExchangeRates = async () => {
+  try {
+    return await axios.get(process.env.COUNTRY_RATE_URL);
+  } catch (error) {
+    res.status(StatusCodes.SERVICE_UNAVAILABLE).json({
+      error: "External data source unavailable",
+      details: "Could not fetch data from open.er-api",
+    });
+  }
 };
 
 export const RefreshCountries = async (req, res) => {
@@ -143,6 +164,15 @@ export const deleteCountry = async (req, res) => {
     res.status(StatusCodes.NOT_FOUND).json({ error: "Country not found" });
 
   res.status(StatusCodes.NO_CONTENT).send();
+};
+
+export const getCountryStatus = async (req, res) => {
+  const total_countries = await prisma.country.count();
+  const { last_refreshed_at } = await prisma.country.findFirst({
+    select: { last_refreshed_at: true },
+  });
+
+  res.status(StatusCodes.OK).json({ total_countries, last_refreshed_at });
 };
 
 await prisma.$disconnect();
