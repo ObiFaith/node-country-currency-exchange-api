@@ -11,6 +11,7 @@ import {
 import { configDotenv } from "dotenv";
 import SwaggerUI from "swagger-ui-express";
 import countryRoutes from "./routes/country.js";
+import { getCountryStatus } from "./controllers/country.js";
 
 configDotenv();
 
@@ -30,6 +31,15 @@ app.get("/", (_, res) =>
     '<h1>Country Currency & Exchange API</h1><a href="/api-docs">Swagger Documentation</a>'
   )
 );
+
+app.get("/status", async (req, res) => {
+  const total_countries = await prisma.country.count();
+  const { last_refreshed_at } = await prisma.country.findFirst({
+    select: { last_refreshed_at: true },
+  });
+
+  res.status(StatusCodes.OK).json({ total_countries, last_refreshed_at });
+});
 app.use("/countries", /* #swagger.tags = ['Countries'] */ countryRoutes);
 
 // error handler
