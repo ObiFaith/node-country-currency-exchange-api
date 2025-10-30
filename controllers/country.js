@@ -1,4 +1,7 @@
+import fs from "fs";
+import path from "path";
 import axios from "axios";
+import sharp from "sharp";
 import { StatusCodes } from "http-status-codes";
 import { PrismaClient } from "../generated/prisma/client.js";
 
@@ -114,6 +117,29 @@ export const RefreshCountries = async (req, res) => {
     await prisma.$executeRawUnsafe(`TRUNCATE TABLE Country`);
     await prisma.country.createMany({ data: countries });
 
+    const top5Countries = await prisma.country.findMany({
+      orderBy: {
+        estimated_gdp: "desc", // Sort descending
+      },
+      take: 5, // Limit to 5 results
+      select: {
+        name: true,
+        estimated_gdp: true,
+      },
+    });
+
+    const strTop5Countries = top5Countries.map(
+      (country) => `${country.name}: ${country.estimated_gdp}`
+    );
+
+    const data = [
+      `Total number of countries: ${countries.length}`,
+      `Timestamp of last refresh: ${last_refreshed_at}`,
+      `Top ${strTop5Countries.length} countries by estimated GDP:`,
+    ].concat(strTop5Countries);
+
+    await createImage(data);
+
     res
       .status(StatusCodes.CREATED)
       .json({ message: "Countries refreshed successfully." });
@@ -138,6 +164,60 @@ export const RefreshCountries = async (req, res) => {
   }
 };
 
+export const getSummaryImage = async (req, res) => {
+  const imagePath = path.join("cache", "summary.png");
+
+  // Check if the image exists
+  if (fs.existsSync(imagePath)) {
+    res.sendFile(path.resolve(imagePath)); // send the image
+  } else {
+    res.status(404).json({ error: "Summary image not found" });
+  }
+};
+
+const createImage = async (data) => {
+  const svgText = `
+    <svg width="800" height="600">
+      ${data
+        .map((content, index) => {
+          const y = 60 + index * 60; // spacing between lines
+          return `
+            <text
+              x="16"
+              y="${y}"
+              font-size="${24}"
+              font-weight="bold"
+              fill="black"
+              textLength="700"
+              lengthAdjust="spacingAndGlyphs"
+            >
+              ${content}
+            </text>
+          `;
+        })
+        .join("")}
+    </svg>
+  `;
+
+  const dir = path.join("cache");
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  await sharp({
+    create: {
+      width: 800,
+      height: 600,
+      channels: 4,
+      background: "white",
+    },
+  })
+    .composite([{ input: Buffer.from(svgText), top: 0, left: 0 }])
+    .toFile("cache/summary.png");
+
+  console.log("Image Created!");
+};
+
 export const getCountry = async (req, res) => {
   const normalized_name = await getNormalizedName(req.params.name);
   const country = await prisma.country.findUnique({
@@ -145,7 +225,9 @@ export const getCountry = async (req, res) => {
   });
 
   if (!country)
-    res.status(StatusCodes.NOT_FOUND).json({ error: "Country not found" });
+    return res
+      .status(StatusCodes.NOT_FOUND)
+      .json({ error: "Country not found" });
 
   res.status(StatusCodes.OK).json(country);
 };

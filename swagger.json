@@ -96,6 +96,22 @@
         }
       }
     },
+    "/countries/image": {
+      "get": {
+        "tags": [
+          "Countries"
+        ],
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/countries/{name}": {
       "get": {
         "tags": [
