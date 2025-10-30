@@ -152,12 +152,18 @@ export const getCountry = async (req, res) => {
 
 export const deleteCountry = async (req, res) => {
   const normalized_name = await getNormalizedName(req.params.name);
-  const country = await prisma.country.delete({ where: { normalized_name } });
 
-  if (!country)
-    res.status(StatusCodes.NOT_FOUND).json({ error: "Country not found" });
-
-  res.status(StatusCodes.NO_CONTENT).send();
+  try {
+    const country = await prisma.country.delete({ where: { normalized_name } });
+    res.status(StatusCodes.NO_CONTENT).send();
+  } catch (err) {
+    if (err.code === "P2025")
+      return res
+        .status(StatusCodes.NOT_FOUND)
+        .json({ error: "Country not found" });
+    console.log(err.message);
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: err.message });
+  }
 };
 
 export const getCountryStatus = async (req, res) => {
